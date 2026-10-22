@@ -1,0 +1,41 @@
+
+# Secrets and environment
+.env
+.env.*
+!.env.example
+.env.local
+.streamlit/secrets.toml
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# SQLite databases and learning data
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Backup files
+*.bak*
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and test artifacts
+*.log
+scratch/
+.system_generated/
