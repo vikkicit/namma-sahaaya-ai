@@ -53,35 +53,40 @@ Every year, hundreds of thousands of professionals, students, and workers move t
 ## 🏗️ High-Level Architecture
 
 ```mermaid
-graph TD
-    User([Learner / User]) <--> UI[Streamlit Frontend (app.py)]
+flowchart TD
+    User["Learner / User"] <--> UI["Streamlit Frontend (app.py)"]
 
-    subgraph "Application Core"
-        UI <--> Coach[AI Phrase Coach (modules/ai_coach.py)]
-        UI <--> DailyGen[Daily Lesson Generator (modules/daily_lesson_generator.py)]
-        UI <--> Dashboard[Progress Dashboard (modules/progress_dashboard.py)]
-        UI <--> Voice[Voice / TTS (modules/voice.py)]
-        UI <--> Quiz[Interactive Quizzes (modules/quiz_progress.py)]
-        UI <--> Favs[Favourites & Revision (modules/favourites.py)]
+    subgraph Core["Application Core"]
+        Coach["AI Phrase Coach (modules/ai_coach.py)"]
+        DailyGen["Daily Lesson Generator (modules/daily_lesson_generator.py)"]
+        Dashboard["Progress Dashboard (modules/progress_dashboard.py)"]
+        Voice["Voice / TTS (modules/voice.py)"]
+        Quiz["Interactive Quizzes (modules/quiz_progress.py)"]
+        Favs["Favourites & Revision (modules/favourites.py)"]
     end
 
-    subgraph "External Intelligence"
-        Coach -.->|generate_content| Gemini[Google Gemini API (gemini-3.8-flash)]
-        DailyGen -.->|structured JSON| Gemini
+    subgraph External["External Intelligence"]
+        Gemini["Google Gemini API (gemini-3.8-flash)"]
     end
 
-    subgraph "Persistence Layer (SQLite)"
-        DailyGen <-->|read / write| LDB[(lesson_progress.db)]
-        Favs <-->|read / write| LDB
-        Dashboard -->|read-only mode| LDB
-        Quiz <-->|read / write| QDB[(quiz_progress.db)]
-        Dashboard -->|read-only mode| QDB
+    subgraph Persistence["Persistence Layer (SQLite)"]
+        SQLite[("SQLite Databases (lesson_progress.db, quiz_progress.db)")]
     end
 
-    subgraph "Offline Fallbacks"
-        Coach -.->|on error / 503| CuratedPhrases[Curated Phrasebook]
-        DailyGen -.->|on error / 503| CuratedLessons[Curated 8-Lesson Library]
-    end
+    UI <--> Coach
+    UI <--> DailyGen
+    UI <--> Dashboard
+    UI <--> Voice
+    UI <--> Quiz
+    UI <--> Favs
+
+    Coach -.-> Gemini
+    DailyGen -.-> Gemini
+
+    DailyGen <--> SQLite
+    Favs <--> SQLite
+    Quiz <--> SQLite
+    Dashboard --> SQLite
 ```
 
 ---
