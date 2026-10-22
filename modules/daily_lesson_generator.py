@@ -13,8 +13,11 @@ import os
 import pathlib
 import re
 import sqlite3
+import time
 import zoneinfo
 from dotenv import load_dotenv
+
+from google.genai import errors as genai_errors
 
 from modules.lessons import LESSONS, LESSON_IDS, LESSONS_BY_ID
 
@@ -28,6 +31,10 @@ MODEL_NAME = "gemini-3.8-flash"
 
 # Primary timezone for local calendar date
 TIMEZONE_NAME = "Asia/Kolkata"
+
+# Retry configuration for transient server errors (503 / overload)
+_MAX_RETRIES = 1
+_RETRY_DELAY_SECONDS = 2
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -406,14 +413,36 @@ Constraints:
 - Ensure natural, polite, and authentic spoken Kannada usage.
 """
 
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt,
-            config={
-                "temperature": 0.2,
-                "max_output_tokens": 1200,
-            },
-        )
+        # Attempt generation with at most one short retry for transient errors
+        last_error = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=prompt,
+                    config={
+                        "temperature": 0.2,
+                        "max_output_tokens": 1200,
+                    },
+                )
+                last_error = None
+                break  # Success — exit retry loop
+            except genai_errors.ServerError as api_err:
+                last_error = api_err
+                code = getattr(api_err, "code", None)
+                if code in (503, 504) and attempt < _MAX_RETRIES:
+                    time.sleep(_RETRY_DELAY_SECONDS)
+                    continue
+                break  # Non-retriable or final attempt
+            except genai_errors.ClientError as api_err:
+                last_error = api_err
+                break  # Client errors (429, etc.) are not retried
+            except Exception as api_err:
+                last_error = api_err
+                break  # Unknown errors are not retried
+
+        if last_error is not None:
+            raise last_error
 
         raw_text = (response.text or "").strip()
         cleaned_json = _clean_json_text(raw_text)
@@ -438,6 +467,22 @@ Constraints:
 
         data["source"] = "ai_generated"
         return data, "Success"
+
+    except genai_errors.ServerError as exc:
+        code = getattr(exc, "code", None)
+        if code == 503 or "503" in str(exc) or "UNAVAILABLE" in str(exc):
+            diag = "Gemini model is currently experiencing high demand (503 Unavailable)."
+        else:
+            diag = "Gemini server error. Please try again later."
+        return None, diag
+
+    except genai_errors.ClientError as exc:
+        code = getattr(exc, "code", None)
+        if code == 429 or "RESOURCE_EXHAUSTED" in str(exc) or "quota" in str(exc).lower():
+            diag = "Gemini API rate limit or quota exceeded (429 Resource Exhausted)."
+        else:
+            diag = "Gemini request error. Please check your configuration."
+        return None, diag
 
     except Exception as exc:
         err_type = type(exc).__name__

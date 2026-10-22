@@ -745,6 +745,7 @@ if page == "AI Phrase Coach":
                 "user_input": user_input,
                 "scenario": coach_scenario,
                 "lang": language,
+                "is_fallback": result.get("is_fallback", False),
             }
 
             # Save to conversation history
@@ -761,9 +762,17 @@ if page == "AI Phrase Coach":
     if st.session_state.get("last_coach_result"):
         res = st.session_state.last_coach_result
         lang_label = "Tamil explanation" if res.get("lang") == "Tamil" else "English explanation"
+        source_badge = (
+            '<span class="ns-badge" style="background:#B45309;color:#fff;font-size:.72rem;">📚 Curated Fallback</span>'
+            if res.get("is_fallback")
+            else '<span class="ns-badge" style="background:#176B55;color:#fff;font-size:.72rem;">✨ AI-Generated</span>'
+        )
         st.markdown(
             f'<div class="ns-result-card">'
-            f'<div class="ns-result-label">Kannada Phrase</div>'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">'
+            f'<div class="ns-result-label" style="margin:0;">Kannada Phrase</div>'
+            f'{source_badge}'
+            f'</div>'
             f'<div class="ns-result-kn">{res["kn"]}</div>'
             f'<div class="ns-result-roman">📣 {res["roman"]}</div>'
             f'<div class="ns-result-label" style="margin-top:.8rem;">{lang_label}</div>'
