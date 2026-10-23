@@ -336,6 +336,95 @@ class TestPhase4Dashboard(unittest.TestCase):
         self.assertEqual(mock_state["nav_page"], "Interactive Quizzes")
         self.assertEqual(mock_state["quiz_topic_picker"], "Shopping")
 
+    def test_08b_pending_navigation_live_path(self):
+        """Live Streamlit path stages nav into _pending_nav_page, not nav_page.
+
+        Regression test for StreamlitWidgetAlreadyInstantiatedError — the
+        live path must never write directly to the widget-bound 'nav_page' key.
+        """
+        from unittest.mock import MagicMock, patch
+
+        mock_ss = {}
+
+        class FakeSessionState(dict):
+            """Minimal stand-in for st.session_state."""
+            def __setitem__(self, key, value):
+                super().__setitem__(key, value)
+            def pop(self, key, *args):
+                return super().pop(key, *args)
+
+        fake_ss = FakeSessionState()
+
+        with patch("modules.progress_dashboard.st") as mock_st:
+            mock_st.session_state = fake_ss
+            # Call WITHOUT state_dict → live path
+            set_page_navigation("Daily Lessons", lesson_view="index")
+            self.assertEqual(fake_ss["_pending_nav_page"], "Daily Lessons")
+            self.assertEqual(fake_ss["_pending_nav_kwargs"], {"lesson_view": "index"})
+            # Must NOT have written to nav_page directly
+            self.assertNotIn("nav_page", fake_ss)
+
+    def test_08c_pending_navigation_kwargs(self):
+        """Verify all kwargs are correctly staged in _pending_nav_kwargs."""
+        from unittest.mock import patch
+
+        class FakeSessionState(dict):
+            pass
+
+        fake_ss = FakeSessionState()
+
+        with patch("modules.progress_dashboard.st") as mock_st:
+            mock_st.session_state = fake_ss
+            set_page_navigation(
+                "My Favourites",
+                rev_active=True,
+                rev_index=0,
+                rev_revealed=False,
+                rev_known=set(),
+                rev_again=set(),
+            )
+            self.assertEqual(fake_ss["_pending_nav_page"], "My Favourites")
+            kw = fake_ss["_pending_nav_kwargs"]
+            self.assertTrue(kw["rev_active"])
+            self.assertEqual(kw["rev_index"], 0)
+            self.assertFalse(kw["rev_revealed"])
+            self.assertEqual(kw["rev_known"], set())
+            self.assertEqual(kw["rev_again"], set())
+            self.assertNotIn("nav_page", fake_ss)
+
+    def test_08d_daily_lessons_curriculum_navigation(self):
+        """'Go to Daily Lessons Curriculum' must navigate to Daily Lessons with lesson_view=index."""
+        from unittest.mock import patch
+
+        class FakeSessionState(dict):
+            pass
+
+        fake_ss = FakeSessionState()
+
+        with patch("modules.progress_dashboard.st") as mock_st:
+            mock_st.session_state = fake_ss
+            set_page_navigation("Daily Lessons", lesson_view="index")
+            self.assertEqual(fake_ss["_pending_nav_page"], "Daily Lessons")
+            self.assertEqual(fake_ss["_pending_nav_kwargs"]["lesson_view"], "index")
+
+    def test_08e_quiz_navigation_pending(self):
+        """Quiz navigation from dashboard must use pending path."""
+        from unittest.mock import patch
+
+        class FakeSessionState(dict):
+            pass
+
+        fake_ss = FakeSessionState()
+
+        with patch("modules.progress_dashboard.st") as mock_st:
+            mock_st.session_state = fake_ss
+            set_page_navigation("Interactive Quizzes", quiz_questions=[], quiz_submitted=False)
+            self.assertEqual(fake_ss["_pending_nav_page"], "Interactive Quizzes")
+            self.assertEqual(fake_ss["_pending_nav_kwargs"]["quiz_questions"], [])
+            self.assertFalse(fake_ss["_pending_nav_kwargs"]["quiz_submitted"])
+            self.assertNotIn("nav_page", fake_ss)
+
+
     def test_09_production_data_safely_readable(self):
         """Read metrics on actual production DBs without altering any records."""
         lm = get_lesson_metrics(self.prod_lesson_db)
