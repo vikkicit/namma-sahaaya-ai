@@ -478,11 +478,25 @@ def generate_recommendations(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def set_page_navigation(target_page: str, state_dict: dict | None = None, **kwargs):
-    """Callback to update session state for page routing."""
-    target = state_dict if state_dict is not None else st.session_state
-    target["nav_page"] = target_page
-    for k, v in kwargs.items():
-        target[k] = v
+    """Callback to update session state for page routing.
+
+    When *state_dict* is supplied (unit-test path), values are written there
+    directly.  When it is ``None`` we are inside a live Streamlit run where the
+    ``nav_page`` key is owned by an already-instantiated ``st.radio`` widget.
+    Writing to that key mid-run raises
+    ``StreamlitWidgetAlreadyInstantiatedError``, so instead we stage the
+    navigation in ``_pending_nav_page`` / ``_pending_nav_kwargs`` which
+    ``app.py`` applies *before* the widget is rendered on the next rerun.
+    """
+    if state_dict is not None:
+        # Unit-test / offline path — write directly.
+        state_dict["nav_page"] = target_page
+        for k, v in kwargs.items():
+            state_dict[k] = v
+    else:
+        # Live Streamlit path — stage for next rerun.
+        st.session_state["_pending_nav_page"] = target_page
+        st.session_state["_pending_nav_kwargs"] = kwargs
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

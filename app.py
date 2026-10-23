@@ -534,6 +534,15 @@ _tip = LEARNING_TIPS[_tip_idx]
 if "_tip_seed" not in st.session_state:
     st.session_state._tip_seed = random.randint(0, 1000)
 
+
+# ── Apply any pending navigation (set by dashboard buttons) ──────────────────
+# Must run BEFORE the st.radio widget that owns the "nav_page" key is
+# instantiated, so that the widget picks up the new default on this rerun.
+if "_pending_nav_page" in st.session_state:
+    st.session_state["nav_page"] = st.session_state.pop("_pending_nav_page")
+    for _k, _v in st.session_state.pop("_pending_nav_kwargs", {}).items():
+        st.session_state[_k] = _v
+
 with st.sidebar:
     st.markdown("""
     <div class="ns-brand">
