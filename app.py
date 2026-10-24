@@ -745,12 +745,13 @@ if page == "AI Phrase Coach":
                     phrases=current_phrases,
                 )
 
-            audio = make_audio(result["kn"])
+            # DECOUPLED: Set last_coach_result IMMEDIATELY so Kannada text,
+            # Roman transliteration, and Tamil explanation display with zero audio delay!
             st.session_state.last_coach_result = {
                 "kn": result["kn"],
                 "roman": result["roman"],
                 "explanation": result["explanation"],
-                "audio": audio,
+                "audio": None,
                 "user_input": user_input,
                 "scenario": coach_scenario,
                 "lang": language,
@@ -764,7 +765,7 @@ if page == "AI Phrase Coach":
                 "content": result["explanation"],
                 "kn": result["kn"],
                 "roman": result["roman"],
-                "audio": audio,
+                "audio": None,
                 "scenario": coach_scenario,
             })
 
@@ -813,7 +814,18 @@ if page == "AI Phrase Coach":
             if res.get("audio"):
                 st.audio(res["audio"], format="audio/mp3")
             else:
-                st.caption("Audio unavailable right now. The phrase text is still displayed above.")
+                if st.button("🔊 Play Audio", key=f"play_coach_curr_{pid}"):
+                    with st.spinner("Loading audio…"):
+                        aud = make_audio(res["kn"])
+                        if aud:
+                            res["audio"] = aud
+                            if st.session_state.chat and st.session_state.chat[-1].get("kn") == res["kn"]:
+                                st.session_state.chat[-1]["audio"] = aud
+                            st.rerun()
+                        else:
+                            st.caption("Audio unavailable right now. The phrase text is still displayed above.")
+                else:
+                    st.caption("Click '🔊 Play Audio' to listen to the pronunciation.")
 
     # Conversation history
     if st.session_state.chat:
@@ -868,6 +880,16 @@ if page == "AI Phrase Coach":
                     with col_h_aud:
                         if ai_msg.get("audio"):
                             st.audio(ai_msg["audio"], format="audio/mp3")
+                        else:
+                            h_pid = generate_phrase_id(kn_h)
+                            if st.button("🔊 Play Audio", key=f"play_chat_{i}_{h_pid}"):
+                                with st.spinner("Loading audio…"):
+                                    aud = make_audio(kn_h)
+                                    if aud:
+                                        ai_msg["audio"] = aud
+                                        st.rerun()
+                                    else:
+                                        st.caption("Audio unavailable right now.")
 
         if st.button("🗑️ Clear conversation", key="clear_chat"):
             st.session_state.chat = []
